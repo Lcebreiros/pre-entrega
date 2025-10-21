@@ -1,179 +1,114 @@
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Scanner;
+import java.util.*;
 
 public class Main {
-
     public static void main(String[] args) {
         Scanner input = new Scanner(System.in);
-        ArrayList<Product> productDB = getInitialProducts();
-        int nextId = productDB.size() + 1;
-        int userOption;
+        List<Producto> productos = getIniciales();
+        int nextId = productos.stream().mapToInt(Producto::getId).max().orElse(0) + 1;
 
-        System.out.println("Bienvenido a la tienda de palas de padel n1");
-
-        label:
         while (true) {
             System.out.println("""
-                    Ingrese el numero de la opcion que desee para continuar:
-                    0 - Salir
-                    1 - Crear un producto
-                    2 - Mostrar productos
-                    3 - Buscar por nombres
-                    4 - Editar un producto
-                    5 - Eliminar producto
-                    6 - Nueva funcion (coming soon)
-                    """);
-            if (!input.hasNextInt()) {
-                System.out.println("Opcion incorrecta");
-                input.next();
-                continue;
-            }
-            userOption = input.nextInt();
-            input.nextLine(); // consume endline
+                0 - Salir
+                1 - Crear producto
+                2 - Mostrar productos
+                3 - Buscar por marca/modelo
+                4 - Editar producto
+                5 - Eliminar producto
+            """);
 
-            switch (userOption) {
-                case 1 -> {
-                    createProduct(nextId, productDB, input);
-                    nextId += 1;
+            if (!input.hasNextInt()) { System.out.println("Opción inválida"); input.next(); continue; }
+            int op = input.nextInt(); input.nextLine();
+
+            switch (op) {
+                case 1 -> { // CREAR
+                    Producto p = addProduct(input);
+                    p.setId(nextId++);
+                    productos.add(p);
+                    System.out.println("✅ Producto agregado\n");
                 }
-                case 2 -> listProducts(productDB, input);
-                case 3 -> searchProductByName(productDB, input);
-                case 4 -> editProduct(productDB, input);
-                case 5 -> deleteProduct(productDB, input);
-                case 6 -> System.out.println("Trabajando en ello");
-                case 0 -> {
-                    System.out.println("Gracias por visitarnos");
-                    break label;
-                }
-                default -> System.out.println("Opcion incorrecta");
+                case 2 -> listar(productos);
+                case 3 -> buscar(productos, input);
+                case 4 -> editar(productos, input);
+                case 5 -> eliminar(productos, input);
+                case 0 -> { System.out.println("👋 Hasta luego"); return; }
+                default -> System.out.println("Opción inválida");
             }
         }
     }
 
-    public static void createProduct(int id, ArrayList<Product> products, Scanner input) {
-        System.out.print("Ingresa un nombre para tu product:2");
-        String name = input.nextLine();
-        products.add(new Product(id, name));
-        pause(input);
+    static Producto addProduct(Scanner input) {
+        System.out.print("Marca: ");     String marca = input.nextLine();
+        System.out.print("Modelo: ");    String modelo = input.nextLine();
+        System.out.print("Precio: ");    double precio = leerDouble(input);
+        System.out.print("Colección: "); String coleccion = input.nextLine();
+        return new Producto(0, marca, modelo, precio, coleccion);
     }
 
-    public static void listProducts(ArrayList<Product> products, Scanner input) {
-        System.out.println("|------------------|");
-        System.out.println("|     Productos    |");
-        System.out.println("|------------------|");
-
-        if (products == null || products.isEmpty()) {
-            System.out.println("No hay productos para mostrar");
-        } else {
-            for (Product product : products) {
-                System.out.printf("%2d. %s%n", product.id, product.name);
-            }
-        }
-        System.out.println("|------------------|");
+    static void listar(List<Producto> productos) {
+        if (productos.isEmpty()) { System.out.println("No hay productos\n"); return; }
+        productos.forEach(p -> System.out.println(p));
+        System.out.println();
     }
 
-    public static void searchProductByName(ArrayList<Product> products, Scanner input) {
-        System.out.println("Ingresa el nombre de un producto...");
-        String search = input.nextLine();
-        ArrayList<Product> foundProducts = new ArrayList<>();
-
-        for (Product product : products) {
-            if (isIncluded(product.name, search)) {
-                foundProducts.add(product);
-
-            }
-        }
-        listProducts(foundProducts, input);
+    static void buscar(List<Producto> productos, Scanner input) {
+        System.out.print("Buscar (marca o modelo): ");
+        String q = input.nextLine().toLowerCase().trim();
+        List<Producto> res = productos.stream()
+                .filter(p -> p.getMarca().toLowerCase().contains(q) || p.getModelo().toLowerCase().contains(q))
+                .toList();
+        if (res.isEmpty()) System.out.println("Sin resultados\n");
+        else res.forEach(p -> System.out.println(p));
+        System.out.println();
     }
 
-    public static void editProduct(List<Product> products, Scanner input) {
-        Product product = getProductById(products, input);
+    static void editar(List<Producto> productos, Scanner input) {
+        Producto p = pedirPorId(productos, input);
+        if (p == null) return;
 
-        if (product == null) {
-            System.out.println("No hay productos para editar");
-            return;
-        }
+        System.out.printf("Editando %s%n", p);
+        System.out.print("Nueva marca (enter = igual): "); String marca = input.nextLine();
+        if (!marca.isBlank()) p.setMarca(marca);
 
-        System.out.printf("Editando: %s%n", product.name);
-        System.out.print("Ingresa el nuevo nombre:");
-        String newName = input.nextLine();
+        System.out.print("Nuevo modelo (enter = igual): "); String modelo = input.nextLine();
+        if (!modelo.isBlank()) p.setModelo(modelo);
 
-        String oldName = product.name;
-        product.name = newName;
+        System.out.print("Nuevo precio (enter = igual): "); String precioTxt = input.nextLine();
+        if (!precioTxt.isBlank()) p.setPrecio(Double.parseDouble(precioTxt));
 
-        System.out.printf("Nombre de  '%s' cambiado a '%s'%n", oldName, newName);
+        System.out.print("Nueva colección (enter = igual): "); String col = input.nextLine();
+        if (!col.isBlank()) p.setColeccion(col);
+
+        System.out.println("✅ Producto actualizado\n");
     }
 
-    public static void deleteProduct(List<Product> products, Scanner input) {
-        Product product = getProductById(products, input);
-
-        if (product == null) {
-            System.out.println("No hay productos que borrar");
-        }
-
-        System.out.printf("Deleting product: %s%n", product.name);
-        products.remove(product);
-        System.out.println("Producto eliminado correctamente");
+    static void eliminar(List<Producto> productos, Scanner input) {
+        Producto p = pedirPorId(productos, input);
+        if (p == null) return;
+        productos.remove(p);
+        System.out.println("Producto eliminado\n");
     }
 
-    public static Product getProductById(List<Product> products, Scanner input) {
-        System.out.print("Enter the product ID: ");
-        while (!input.hasNextInt()) {
-            System.out.print("Please enter a valid numeric ID: ");
-            input.next();
-        }
-        int idSearch = input.nextInt();
-        input.nextLine(); // consume endline
-
-        for (Product product : products) {
-            if (product.id == idSearch) {
-                return product;
-            }
-        }
-        return null;
+    static Producto pedirPorId(List<Producto> productos, Scanner input) {
+        if (productos.isEmpty()) { System.out.println("No hay productos\n"); return null; }
+        System.out.print("ID: ");
+        if (!input.hasNextInt()) { System.out.println("ID inválido\n"); input.nextLine(); return null; }
+        int id = input.nextInt(); input.nextLine();
+        return productos.stream().filter(x -> x.getId() == id).findFirst()
+                .orElseGet(() -> { System.out.println("No existe ese ID\n"); return null; });
     }
 
-    public static boolean isIncluded(String fullName, String partialName) {
-        return formatSearch(fullName).contains(formatSearch(partialName));
+    static double leerDouble(Scanner in) {
+        while (!in.hasNextDouble()) { System.out.print("Número inválido, reintente: "); in.next(); }
+        double v = in.nextDouble(); in.nextLine(); return v;
     }
 
-    public static String formatSearch(String text) {
-        return text.trim().toLowerCase();
-    }
-
-    public static void pause(Scanner input) {
-        System.out.println("Presiona ENTER para continuar...");
-        input.nextLine();
-        for (int i = 0; i < 10; ++i) System.out.println();
-    }
-
-    public static ArrayList<Product> getInitialProducts() {
-        ArrayList<Product> products = new ArrayList<>();
-
-        products.add(new Product(1, "Pala Nox AT10 18k Genius 2026"));
-        products.add(new Product(2, "Pala Nox AT10 12k Genius 2026"));
-        products.add(new Product(3, "Pala Nox AT10 18k Attack 2026"));
-        products.add(new Product(4, "Pala Adidas Metalbone 3.4 Ale Galan"));
-        products.add(new Product(5, "Pala adidas Metalbone 3.4 HRD"));
-        products.add(new Product(6, "Pala Babolat Technical Viper Juan Lebron"));
-        products.add(new Product(7, "Pala Bullpadel Neuron 02 Edge Federico Chingotto 2026"));
-        products.add(new Product(8, "Pala Head Coello Pro 2025"));
-        products.add(new Product(9, "Pala Bullpadel Vertex 05 Geo Pablo Cardona"));
-        products.add(new Product(10, "Pala Bullpadel Hack 05 2026 Paquito Navarro"));
-
-        return products;
-    }
-
-    public static class Product {
-        public int id;
-        public String name;
-
-        public Product(int id, String name) {
-            this.id = id;
-            this.name = name;
-        }
+    static List<Producto> getIniciales() {
+        return new ArrayList<>(List.of(
+                new Producto(1, "Adidas", "Metalbone 3.4", 400, "Ale Galán"),
+                new Producto(2, "Nox", "AT10 12L", 395, "Agustín Tapia"),
+                new Producto(3, "Babolat", "Technical Viper", 340, "Juan Lebrón"),
+                new Producto(4, "Head", "Coello Pro", 395, "Arturo Coello"),
+                new Producto(5, "Bullpadel", "Neuron 02 Edge", 395, "Fede Chingotto")
+        ));
     }
 }
-
-
